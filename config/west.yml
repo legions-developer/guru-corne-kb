@@ -12,7 +12,8 @@ manifest:
       import: app/west.yml
     - name: zmk-nice-oled
       url: https://github.com/mctechnology17/zmk-nice-oled
-      revision: main
+      # Pin the upstream renderer hooks and assets used by our local OLED module.
+      revision: 46f824abb2bd41f1287c5c68abd14122af6042a3
       path: modules/zmk-nice-oled
   self:
     path: config
