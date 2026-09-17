@@ -1,0 +1,15 @@
+/* Display labels only: merge into the existing layers without changing bindings. */
+/* Four characters or fewer fit the module's 32-pixel portrait canvas. */
+/ {
+    keymap {
+        default_layer {
+            display-name = "BASE";
+        };
+        lower_layer {
+            display-name = "LOW";
+        };
+        raise_layer {
+            display-name = "RSE";
+        };
+    };
+};
