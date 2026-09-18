@@ -1,4 +1,94 @@
-# Local OLED customizations
+# Minimal Corne OLED status
+
+Both portrait SSD1306 displays show the same simple layout, using **their own**
+battery percentage. The selected Bluetooth host profile and highest active layer
+come from the central. Bluetooth profiles, split roles, board, and display
+hardware settings are unchanged.
+
+```text
+     LEFT         RIGHT
+   +-------+    +-------+
+   |  75%  |    |  82%  |  Own battery; USB while plugged in
+   |  BT1  |    |  BT1  |  Central's selected host profile (1–5)
+   |       |    |       |
+   |  (L)  |    |  (L)  |  LOW  — outlined circular badge
+   |  [B]  |    |  [B]  |  BASE — filled circular badge
+   |  (R)  |    |  (R)  |  RSE  — outlined circular badge
+   +-------+    +-------+
+```
+
+The drawing uses actual circles; square brackets above indicate the filled one.
+Order is L at the top, B in the middle, and R at the bottom on both displays.
+Holding LOW fills L; holding RSE fills R. If both are held, R wins, matching
+ZMK's highest-layer precedence. Releasing the layer keys restores B. Before the
+right half receives its first status, or when disconnected, it shows `BT-` and
+three unfilled circles rather than stale central information. `BT1` identifies
+the selected profile; it does not claim the host is currently connected.
+
+On LOWER, the eleven blank third-row positions after Shift use `&none`. On RAISE,
+the ten blank letter positions after Ctrl and Shift also use `&none`. These keys
+produce no input while their layer is held, instead of falling through to the
+underlying layer via `&trans`. Modifiers, thumb keys, assigned symbols, and other
+bindings are unchanged; remaining `&trans` positions still inherit the underlying
+layer.
+
+## Rendering and power behavior
+
+`CONFIG_NICE_OLED_WIDGET_STATUS=n` excludes the upstream widget collection and
+its animation assets/listeners. The local `zmk_display_status_screen()` supplies
+both screens through ZMK's existing custom-screen entry point. The nice_oled
+shield and its safe display queue defaults remain in use. The renderer needs
+`CONFIG_LV_USE_CANVAS=y`; `CONFIG_LV_USE_ANIMIMG=n` excludes the animation widget.
+Only the module's 12- and 16-pixel fonts are compiled.
+
+The portrait canvas is exactly 32×128 pixels and rotates into a 128×32 buffer.
+Battery is at the top, the profile below it, then three vertically stacked
+24-pixel circles. It redraws only on status or local battery/USB events.
+`CONFIG_ZMK_WPM=n` and disabled upstream WPM widgets remove the WPM calculation,
+timer, label and retained-speed code. Bongo Cat, its typing relay, and all custom
+remote wake/blank callbacks have been deleted.
+
+ZMK's normal wake/sleep behavior remains unchanged. The existing
+`CONFIG_ZMK_DISPLAY_BLANK_ON_IDLE=y` blanks displays after the default 30 seconds
+of local inactivity; display queue priority remains 5. Receiving a layer/profile
+update changes cached screen contents without waking a blanked display. The
+current status appears on the next normal wake. There is no extra idle polling,
+host application, Raw HID, or flash storage.
+
+## Layer and profile synchronization
+
+ZMK resolves layers and host Bluetooth profiles on the central, so a peripheral
+cannot independently compute these values. `status_relay.c` sends a compact
+snapshot only when the layer/profile values change or the split reconnects.
+It discovers the existing encrypted split behavior characteristic and uses an
+internal `oledstat` behavior on the right, with no keymap binding or new service.
+It uses the characteristic's advertised Write Without Response mode and waits
+for each transmit completion before submitting the latest pending snapshot.
+This completion is not an application-level acknowledgement. Each half reads
+its own battery locally; battery levels are never copied between displays.
+
+The relay keeps one snapshot in flight and coalesces newer changes. A layer-key
+release that occurs during a send still leaves the peripheral on the latest
+layer. Temporary submission failures use at most three delayed retries, then
+wait for a genuine status change/reconnect. Bluetooth work runs on the dedicated
+display queue, outside input event callbacks. Reconnecting sends a fresh snapshot
+even if its values have not changed. The split behavior wire format and BLE APIs
+are pinned-version dependencies to recheck when upgrading ZMK.
+
+Run the protocol/coalescing checks from the repository root:
+
+```sh
+cc -std=c11 -Wall -Wextra -Werror tests/oled_status_relay.c -o /tmp/corne-oled-status-test
+/tmp/corne-oled-status-test
+```
+
+Run `python3 scripts/preview-oled.py` to render the actual drawing code and
+check all layer states, USB, disconnected status, and percentage widths. It uses
+the prepared LVGL source, the same fonts, Pillow, and the documented macOS SDK.
+Full firmware builds and a physical check of both halves are still needed to
+verify Bluetooth delivery and the actual OLED appearance. Rebuild both firmware files
+with `python3 scripts/build-local.py`; the matching pair is published in `latest/`
+only after both builds succeed.
 
 ## Battery indication while connected to USB
 
@@ -17,11 +107,10 @@ documents this supply-switching limitation and an unusable separate battery
 sense connection. A live charging percentage needs independently verified
 battery sensing or a fuel gauge; this is not fixed by an OLED setting.
 
-`battery.c` wraps only the upstream `draw_battery_status` renderer. It uses the
-existing battery position and font, preserving the original percentage renderer
-on battery power. The extension is enabled only for the VDDH battery driver with
-USB and battery reporting; it should not hide readings from an independent
-battery sensor if the hardware is changed later.
+`status_screen.c` reads each half's own battery state. Its renderer uses `USB`
+only when the configured VDDH battery driver is USB-powered. `battery.c` retains
+the one-time sample refresh after unplugging; it no longer wraps an upstream
+drawing function.
 
 After USB disconnects, one delayed refresh requests a new reading after 500 ms
 instead of waiting for the normal 60-second interval or the next keyboard wake.
@@ -32,101 +121,7 @@ briefly before the fresh sample arrives. Normal voltage-based estimates still
 vary with battery load and settling after charging.
 
 The `battery_work` symbol is internal to the pinned ZMK v0.3 source; recheck it
-and the external `draw_battery_status` renderer when upgrading. This OLED change
+when upgrading. This OLED change
 does not replace ZMK's battery estimator or fabricate host battery reports.
 See [ZMK's battery sensing documentation](https://zmk.dev/docs/hardware-integration/battery)
 for the distinction between VDDH sensing and an independent battery input.
-
-## Central WPM label
-
-The SSD1306 renderer in `zmk-nice-oled` has no setting for a WPM prefix or for
-retaining the last typing speed. This small local Zephyr module replaces only
-its external `draw_wpm_status` renderer using the firmware linker's `--wrap`
-option. The existing user-config build workflow discovers it through
-`zephyr/module.yml`. The repository's board root stays enabled.
-
-The central display shows `WPM:` with the number underneath, centered in the
-32-pixel canvas using the module's bundled font. Position the block with the
-existing `CONFIG_NICE_OLED_WIDGET_WPM_LABEL_CUSTOM_X/Y` settings. It occupies
-22 pixels vertically. Keep the upstream WPM graph and speedometer disabled;
-this renderer displays the number only.
-
-ZMK measures WPM once per second. The display keeps the latest nonzero reading
-from an interval with a key release in the preceding second. After typing
-stops, it holds that reading instead of following the core counter's decay.
-This is the last sampled speed, not a whole-session average. It resets on
-reboot and resumes updates when typing produces another WPM sample. No values
-are written to flash.
-
-The upstream central screen still handles redraws and idle blanking. One
-extra event listener records key-release timing and WPM samples using atomics.
-Only WPM events update the held value, so battery or layer redraws cannot
-replace it with a stale core reading when typing resumes. There are no
-additional timers, threads, host integrations, or split messages. The raw WPM
-events are unchanged, so animation widgets can still react to actual activity.
-The peripheral firmware does not compile or link this extension.
-
-If updating `zmk-nice-oled`, verify that its central screen still calls the
-external `draw_wpm_status` function before canvas rotation. The wrapper uses
-the public ZMK WPM event and does not copy upstream state structures or sources.
-
-Run the host-side retention checks from the repository root:
-
-```sh
-cc -std=c11 -Wall -Wextra -Werror tests/oled_wpm_retention.c -o /tmp/corne-oled-wpm-test
-/tmp/corne-oled-wpm-test
-```
-
-These cover idle decay, resumed typing, boot state, timing boundaries, and
-uptime rollover. A full Zephyr build is still required to check firmware
-linking and the physical OLED appearance.
-
-## Peripheral Bongo Cat
-
-The right screen replaces the upstream looping Cat through `--wrap=draw_animation`.
-It keeps the module's own-half battery percentage and split-link indicator above
-the cat. The existing MIT-licensed Bongo assets are sampled into a 17x32 native
-canvas, fitting a complete upright 32x17 cat on the physically vertical OLED.
-Foreground pooling preserves thin outlines when reducing the artwork; the
-renderer invalidates its canvas once per frame. Indexed-image rotation is not
-required. Idle uses one still frame; alternating
-paw frames appear while typing, returning to idle 500 ms after the last update.
-
-The central sees resolved keycode presses from both halves and sends a cumulative
-sequence through ZMK's existing split behavior channel. An internal peripheral
-behavior named `corne_bongo` receives it, without a keymap binding, additional BLE
-service, or host application. Updates coalesce at most once per 200 ms. All
-Bluetooth submission and drawing happen on the existing dedicated display queue
-at its unchanged priority 5; the typing listener only records state and schedules
-work. Very fast typing produces at most five visible paw changes per second,
-rather than a separate OLED refresh for every key. There is no idle polling or
-flash storage. Layer switches alone do not generate typing animation.
-
-Left-only typing also wakes the right OLED. Display-only callbacks retain its
-30-second idle blanking while leaving ZMK's activity and deep-sleep state alone.
-Local right-side activity continues to use normal ZMK blanking. This does not
-enable deep sleep or make the left half wake a powered-off peripheral.
-
-[SamIAm2000's dedicated-work-queue implementation](https://github.com/SamIAm2000/zmk/blob/11bff388f56f5e558e0e072c733544db51fd5095/app/src/display/widgets/bongo_cat.c)
-was checked: it reacts to central keycode events, but does not relay typing to a
-peripheral. This customization keeps stock ZMK v0.3 and the existing nice_oled
-assets instead of switching firmware forks or importing its full-screen art.
-
-The relay uses ZMK v0.3's split transport API and display blank/unblank callbacks.
-Recheck those APIs and the external `draw_animation` call when upgrading ZMK or
-nice_oled. The existing transport has a bounded command queue and may block its
-caller briefly; running the caller on the display queue keeps this outside the
-key-processing path. Failed display updates are dropped, and reconnection does
-not replay stale typing. ZMK v0.3's peripheral command handler can log an
-`ENOTSUP` warning after successfully invoking a remote behavior because of its
-existing switch fall-through; no core firmware is patched here.
-
-```sh
-cc -std=c11 -Wall -Wextra -Werror tests/oled_bongo_relay.c -o /tmp/corne-oled-bongo-test
-/tmp/corne-oled-bongo-test
-```
-
-These checks cover burst coalescing, the five-update-per-second bound, absent
-peers, reconnection, idle suppression, independent animation/blanking deadlines,
-and uptime rollover. Full builds and physical testing on both halves are still
-needed for Bluetooth delivery and OLED orientation.
