@@ -3,10 +3,13 @@
 - **`left.uf2`** — left / central, `nice_nano_v2`, `corne_left nice_oled`.
 - **`right.uf2`** — right / peripheral, `nice_nano_v2`, `corne_right nice_oled`.
 
+On BASE, the former semicolon key types a double quote (`"`) without holding Shift.
+
 Both screens now show their own battery, the selected Bluetooth profile, and
-L/B/R layer circles (top to bottom) with the active layer filled. The eleven blank
-third-row positions after Shift on LOWER and the ten blank letter positions on
-RAISE produce no input. WPM, Bongo Cat, and custom remote waking are removed;
+L/B/R layer circles (top to bottom) with the active layer filled. LOWER has an
+inverted-T arrow cluster: Up above Left / Down / Right. Its eleven unused positions
+and the ten blank letter positions on RAISE produce no input. WPM, Bongo Cat, and
+custom remote waking are removed;
 ZMK's normal wake/idle blanking remains in place.
 Flash **both** files for matching layer/profile synchronization. See
 [the layout and behavior notes](../oled/README.md).

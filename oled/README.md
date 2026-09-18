@@ -25,12 +25,13 @@ right half receives its first status, or when disconnected, it shows `BT-` and
 three unfilled circles rather than stale central information. `BT1` identifies
 the selected profile; it does not claim the host is currently connected.
 
-On LOWER, the eleven blank third-row positions after Shift use `&none`. On RAISE,
-the ten blank letter positions after Ctrl and Shift also use `&none`. These keys
-produce no input while their layer is held, instead of falling through to the
-underlying layer via `&trans`. Modifiers, thumb keys, assigned symbols, and other
-bindings are unchanged; remaining `&trans` positions still inherit the underlying
-layer.
+On LOWER, the right-hand arrows form an inverted T: Up at the base J position,
+with Left / Down / Right at N / M / comma underneath. The number row is unchanged.
+The eleven unused positions around this layout use `&none`. On RAISE, the ten
+blank letter positions after Ctrl and Shift also use `&none`. These disabled keys
+produce no input while their layer is held; remaining `&trans` positions still
+inherit the underlying layer. Modifiers, thumbs, Bluetooth shortcuts, and assigned
+RAISE symbols are unchanged.
 
 ## Rendering and power behavior
 
