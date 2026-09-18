@@ -4,6 +4,8 @@
 - **`right.uf2`** — right / peripheral, `nice_nano_v2`, `corne_right nice_oled`.
 
 On BASE, the former semicolon key types a double quote (`"`) without holding Shift.
+Enter is now the top-right key, and Backspace is on the right thumb; this swap
+applies to BASE, LOWER, and RAISE.
 
 Both screens now show their own battery, the selected Bluetooth profile, and
 L/B/R layer circles (top to bottom) with the active layer filled. LOWER has an

@@ -30,8 +30,9 @@ with Left / Down / Right at N / M / comma underneath. The number row is unchange
 The eleven unused positions around this layout use `&none`. On RAISE, the ten
 blank letter positions after Ctrl and Shift also use `&none`. These disabled keys
 produce no input while their layer is held; remaining `&trans` positions still
-inherit the underlying layer. Modifiers, thumbs, Bluetooth shortcuts, and assigned
-RAISE symbols are unchanged.
+inherit the underlying layer. Enter and Backspace are swapped on all three layers:
+Enter is the top-right key and Backspace is the right thumb key. Modifiers, layer
+controls, Bluetooth shortcuts, and assigned RAISE symbols are unchanged.
 
 ## Rendering and power behavior
 
